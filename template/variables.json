@@ -10,21 +10,21 @@
     },
     "ssh": {
         "user": {
-            "name": "dockware",
-            "pwd": "dockware"
+            "name": "www-data",
+            "pwd": "www-data"
         }
     },
     "php": {
         "default_version": "7.4",
         "versions": {
             "8.1": {
-                "active": true,
+                "active": false,
                 "folder_id": "20210902",
                 "xdebug_version": "3",
                 "xdebug_tag": "3.1.4"
             },
             "8.0": {
-                "active": true,
+                "active": false,
                 "folder_id": "20200930",
                 "xdebug_version": "3",
                 "xdebug_tag": "3.1.4"
@@ -36,25 +36,25 @@
                 "xdebug_tag": "3.1.4"
             },
             "7.3": {
-                "active": true,
+                "active": false,
                 "folder_id": "20180731",
                 "xdebug_version": "3",
                 "xdebug_tag": "3.1.4"
             },
             "7.2": {
-                "active": true,
+                "active": false,
                 "folder_id": "20170718",
                 "xdebug_version": "3",
                 "xdebug_tag": "3.1.4"
             },
             "7.1": {
-                "active": true,
+                "active": false,
                 "folder_id": "20160303",
                 "xdebug_version": "2",
                 "xdebug_tag": "2.7.2"
             },
             "7.0": {
-                "active": true,
+                "active": false,
                 "folder_id": "20151012",
                 "xdebug_version": "2",
                 "xdebug_tag": "2.7.2"

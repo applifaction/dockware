@@ -131,10 +131,10 @@ RUN apt-get update \
 {% block users_setup %}
 # set easy root pwd for dev purpose
 RUN echo "root:root" | chpasswd \
-    # set password for www-data, and also
+    # set password for {{ ssh.user.name }}, and also
     # avoid shell login (we have a separate user for that)
-    && echo 'www-data:www-data' | chpasswd \
-    && usermod -s /usr/sbin/nologin www-data \
+    && echo '{{ ssh.user.name }}:{{ ssh.user.name }}' | chpasswd \
+    && usermod -s /usr/sbin/nologin {{ ssh.user.name }} \
     # this option makes sure to avoid root SSH login
     # we just replace our lines with nothing
     && sed -i 's/PermitRootLogin without-password//' /etc/ssh/sshd_config \
@@ -146,12 +146,8 @@ RUN echo "root:root" | chpasswd \
     && sed -i /etc/sudoers -re 's/^#includedir.*/## **Removed the include directive** ##"/g'
 {% endblock %}
 
-{% block users_ssh_add %}
-{% include 'template/components/ssh/add_user.sh.twig' with {'user': ssh.user.name, 'pwd' : ssh.user.pwd, 'sudo' : true } %}
-{% endblock %}
-
 {% block users_ssh_connection %}
-RUN echo 'AllowUsers {{ ssh.user.name }}' >> /etc/ssh/sshd_config
+RUN echo 'AllowUsers {{ ssh.user.name }} >> /etc/ssh/sshd_config'
 {% endblock %}
 
 {% endblock %}
@@ -172,9 +168,9 @@ ADD ./config/apache/sites.conf /etc/apache2/sites-enabled/000-default.conf
 
 {% endblock %}
 
-# create a new id_rsa for the www-data dockeruser.
+# create a new id_rsa for the {{ ssh.user.name }} dockeruser.
 # thus we have a SSH Key for connections out of the box
-{% set id_rsa_vars = { 'user' : 'www-data', 'group' : 'www-data', 'directory': '/var/www/.ssh', 'comment' : 'Dockware Container'} %}
+{% set id_rsa_vars = { 'user' : ssh.user.name, 'group' : ssh.user.name, 'directory': '/var/www/.ssh', 'comment' : 'Dockware Container'} %}
 {% include 'template/components/ssh/create_key.sh.twig' with id_rsa_vars %}
 
 
@@ -203,26 +199,26 @@ RUN service php{{ php.default_version }}-fpm stop > /dev/null 2>&1 && \
 
 
 # make sure our php user has rights on the session
-RUN chown www-data:www-data -R /var/lib/php/sessions
+RUN chown {{ ssh.user.name }}:{{ ssh.user.name }} -R /var/lib/php/sessions
 {% endblock %}
 
 # remove the standard apache index file
 RUN mkdir -p /var/www/html \
     && rm -rf /var/www/html/* \
-    && chown -R www-data:www-data /var/www/html \
-    && sudo -u www-data sh -c 'mkdir -p /var/www/html/public'
+    && chown -R {{ ssh.user.name }}:{{ ssh.user.name }} /var/www/html \
+    && sudo -u {{ ssh.user.name }} sh -c 'mkdir -p /var/www/html/public'
 
 
 {% block permissions %}
 # make sure the configured log folder exists and is writeable
 RUN chmod -R 0777 /var/www \
-    && chgrp -R www-data /var/log/apache2 \
+    && chgrp -R {{ ssh.user.name }} /var/log/apache2 \
     && mkdir -p /var/log/mysql \
-    && chgrp -R www-data /var/log/mysql\
+    && chgrp -R {{ ssh.user.name }} /var/log/mysql\
     && mkdir /var/log/php -p  \
     && touch /var/log/php/cli_errors.log  \
     && touch /var/log/php/fpm_errors.log  \
-    && chown -R www-data:www-data /var/log/php  \
+    && chown -R {{ ssh.user.name }}:{{ ssh.user.name }} /var/log/php  \
     && chmod 0755 /var/log/php
 {% endblock %}
 
@@ -279,7 +275,7 @@ RUN apt-get update \
 
 {% block components_packagers_yarn %}
 RUN npm install -g yarn \
-    && chown -R www-data:www-data /var/www/.composer \
+    && chown -R {{ ssh.user.name }}:{{ ssh.user.name }} /var/www/.composer \
 {% endblock %}
 
 {% endblock %}
@@ -357,7 +353,7 @@ COPY /config/pimpmylog/config.user.json /var/www/pimpmylog/config.user.json
 # its used from here: https://github.com/potsky/PimpMyLog/pull/149/files
 COPY /config/pimpmylog/global.inc.php /var/www/pimpmylog/inc/global.inc.php
 
-RUN chown -R www-data:www-data /var/www/pimpmylog/
+RUN chown -R {{ ssh.user.name }}:{{ ssh.user.name }} /var/www/pimpmylog/
 {% endblock %}
 
 {% block components_filebeat %}
@@ -400,105 +396,16 @@ COPY ./assets/shopware6/files /var/www/scripts/shopware6
 {% endblock %}
 
 {% endblock %}
-RUN chown www-data:www-data -R /var/www/scripts
+RUN chown {{ ssh.user.name }}:{{ ssh.user.name }} -R /var/www/scripts
 #make sure for the whole isntallation xdebug is off for performance
 RUN sh /var/www/scripts/bin/xdebug_disable.sh
 
-
-
-{% block shopware %}
-
-{% block shopware_install %}
-## ***********************************************************************
-##  INSTALL SHOPWARE
-## ***********************************************************************
-RUN rm -rf /var/www/html/* \
-    && wget {{ shopware.download_url }} -qq -O /var/www/shopware.zip \
-    && sudo -u www-data sh -c 'unzip -q /var/www/shopware.zip -d /var/www/html' \
-    && rm -rf /var/www/shopware.zip
-{% endblock %}
-
-{% block shopware_prepare %}
-
-{% block shopware_prepare_env %}
-RUN echo "APP_ENV={{ shopware.env }}" >> /var/www/html/.env && \
-    echo "APP_SECRET=1" >> /var/www/html/.env && \
-    echo "INSTANCE_ID=1" >> /var/www/html/.env && \
-    echo "DATABASE_URL=mysql://{{ db.user }}:{{ db.pwd }}@{{ db.host }}:{{ db.port }}/{{ db.database }}" >> /var/www/html/.env && \
-    echo "APP_URL={{ shopware.url }}" >> /var/www/html/.env && \
-    echo "MAILER_URL=smtp://localhost:1025" >> /var/www/html/.env && \
-    echo "COMPOSER_HOME=/var/www/html/var/cache/composer" >> /var/www/html/.env && \
-    echo "SHOPWARE_ES_ENABLED=0" >> /var/www/html/.env && \
-    chown www-data:www-data /var/www/html/.env
-{% endblock %}
-
-
-RUN service mysql start && \
-    # switch to default PHP before installing
-    sudo update-alternatives --set php /usr/bin/php{{ php.default_version }} > /dev/null 2>&1 && \
-    cd /var/www/html && sudo -u www-data sh -c 'php bin/console system:install --create-database --basic-setup' && \
-    # make sure assets like logos are ready
-    cd /var/www/html && sudo -u www-data sh -c 'php bin/console assets:install' && \
-    # add some demo data
-    {% if version_gte(shopware.version, '6.2.0-rc1') %}
-    cd /var/www/html && sudo -u www-data sh -c 'APP_ENV=prod php bin/console store:download -p SwagPlatformDemoData' && \
-    cd /var/www/html && sudo -u www-data sh -c 'APP_ENV=prod php bin/console plugin:refresh' && \
-    cd /var/www/html && sudo -u www-data sh -c 'APP_ENV=prod php bin/console plugin:install --activate SwagPlatformDemoData' && \
-    {% else %}
-    cd /var/www/html && sudo -u www-data sh -c 'APP_ENV=prod php bin/console framework:demodata' && \
-    {% endif %}
-    # clear cache and refresh dal index to show the new demo data
-    cd /var/www/html && sudo -u www-data sh -c 'php bin/console cache:clear' && \
-    cd /var/www/html && sudo -u www-data sh -c 'php bin/console dal:refresh:index' && \
-    rm -rf /var/www/html/var/cache/* && \
-    mysql --user={{ db.user }} --password={{ db.pwd }} -e "use {{ db.database }}; INSERT INTO system_config (id, configuration_key, configuration_value, sales_channel_id, created_at, updated_at) VALUES (X'b3ae4d7111114377af9480c4a0911111', 'core.frw.completedAt', '{\"_value\": \"2019-10-07T10:46:23+00:00\"}', NULL, '2019-10-07 10:46:23.169', NULL);" && \
-    service mysql stop
-{% endblock %}
-
-{% block shopware_dev %}
-
-{% block shopware_dev_install %}
-RUN service mysql start && \
-    # fix weird problem with invalid phpunit file
-    # without this, it cannot find an autoload and thus it
-    # always says "please install composer dependencies"
-    rm -rf /var/www/html/vendor/bin/phpunit && \
-    sudo -u www-data cat /var/www/html/composer.json && \
-    cd /var/www/html/ && composer install && \
-    # install and pre-build our admin and storefront
-    chown -R 33:33 /root/.npm  && \
-    cd /var/www/html && ./bin/build.sh && \
-    cd /var/www/html && php bin/console theme:compile  && \
-    service mysql stop
-{% endblock %}
-
-{% block shopware_dev_plugin %}
-COPY ./assets/shopware6/DockwareSamplePlugin /var/www/html/custom/plugins/DockwareSamplePlugin
-
-RUN service mysql start && \
-    cd /var/www/html && php bin/console plugin:refresh && \
-    cd /var/www/html && php bin/console plugin:install DockwareSamplePlugin && \
-    cd /var/www/html && php bin/console plugin:activate DockwareSamplePlugin && \
-    rm -rf /var/www/html/var/cache/* && \
-    service mysql stop
-{% endblock %}
-
-{% endblock %}
-
-# sometimes there are permission problems
-# so make sure to assign them correctly again here
-RUN chown -R www-data:www-data /var/www/html && \
-    chmod -R 775 /var/www/html && \
-    cd /var/www/scripts/shopware6 && php create_jwt.php && \
-    cd /var/www/html/config/jwt && chown www-data:www-data *
-{% endblock %}
-
 # some images dont have that folder. make sure its there
 RUN mkdir -p /var/www/.composer \
-    && chown www-data:www-data /var/www/.composer -R \
-    # find all files and folders owned by root and chown to www-data
-    && find /var/www -group root -exec chown www-data:www-data {} \; \
-    && find /var/www -user root -exec chown www-data:www-data {} \;
+    && chown {{ ssh.user.name }}:{{ ssh.user.name }} /var/www/.composer -R \
+    # find all files and folders owned by root and chown to {{ ssh.user.name }}
+    && find /var/www -group root -exec chown {{ ssh.user.name }}:{{ ssh.user.name }} {} \; \
+    && find /var/www -user root -exec chown {{ ssh.user.name }}:{{ ssh.user.name }} {} \;
 
 ## ***********************************************************************
 ##  CLEAN UP / POST BUILD
