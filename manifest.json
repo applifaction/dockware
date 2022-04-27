@@ -4,6 +4,9 @@
             "flex/latest:latest",
             "flex/beta:beta"
         ],
+        "tiny": [
+            "tiny/latest:latest"
+        ],
         "essentials": [
             "essentials/latest:latest",
             "essentials/test-php8.1:test-php8.1"
