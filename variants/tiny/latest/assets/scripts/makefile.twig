@@ -15,15 +15,13 @@ else
 endif
 {% endblock %}
 
-
-{% block watcher_storefront %}
-{% endblock %}
-
 {% block watcher_admin %}
-{% endblock %}
-
-{% block build_admin %}
-{% endblock %}
-
-{% block contribute_pull %}
+watch-admin: ## starts watcher for Shopware Admin at http://localhost:8888
+        export APP_URL=http://localhost
+        export PROJECT_ROOT=/var/www/html
+        export ENV_FILE=/var/www/html/.env
+        export HOST=0.0.0.0
+        export PORT=8888
+        export APP_ENV=dev
+        cd /var/www/html && ./bin/watch-administration.sh
 {% endblock %}
