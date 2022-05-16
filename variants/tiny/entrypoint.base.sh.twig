@@ -11,3 +11,13 @@ echo "ATTENTION, THIS IMAGE COMES WITHOUT SHOPWARE!"
 echo "IT OFFERS A FULL ENVIRONMENT FOR YOUR PERSONAL SHOPWARE 6 SETUP"
 echo ""
 {% endblock %}
+
+{% block components %}
+
+{{ parent() }}
+
+{% block components_nvm %}
+    nvm use 16
+{% endblock %}
+
+{% endblock %}
